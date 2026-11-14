@@ -57,7 +57,7 @@ def test_render_conditions(family):
     raw = render_code(base, view="raw", injection=family, is_attack=True, key="k")
     assert raw != base and raw.endswith(base)
     stripped = render_code(base, view="stripped", injection=family, is_attack=True, key="k")
-    survives = family == "heldout_nocomment"
+    survives = family in ("heldout_nocomment", "ident_en")
     assert (stripped.strip() != base.strip()) == survives
 
 
