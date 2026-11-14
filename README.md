@@ -39,10 +39,25 @@ dos lecturas (`scripts/analyze.py`).
     .\.venv\Scripts\python scripts\bateria.py --model google/<modelo> --offset 0 --limit 36
     .\.venv\Scripts\python scripts\scorecard.py          # boletin: tablas y figura en results/boletin
     .\.venv\Scripts\python scripts\scorecard.py --gate   # codigo de salida 1 si algun canal CEDE
+    .\.venv\Scripts\python scripts\paquete.py --gate    # paquete autorizado, offline, PASS/FAIL
 
 El ultimo comando es el uso en produccion: se corre antes de cambiar el modelo monitor (o cuando el proveedor
 retira el que se usaba) y bloquea el cambio si el modelo nuevo se deja hablar. Un tramo de 36 entregas cabe
 en la cuota gratuita diaria de un modelo; `--offset` reparte la bateria entre varias llaves (ver BATERIA.md).
+
+## Reproducir sin API key
+
+`scripts/paquete.py` no llama a ningun proveedor: lee los CSV que ya estan en el repo y reconstruye el
+paquete de resultados en unos segundos. Es lo que hay que correr para verificar lo que afirmamos.
+
+    PYTHONPATH=. python scripts/paquete.py          # boletin + results/paquete/*.csv
+    PYTHONPATH=. python scripts/paquete.py --gate   # ademas sale con codigo 1 si algun control falla
+
+Imprime la procedencia de cada numero (commit, hash del prompt, archivos de origen, registros descartados),
+calibra el umbral sobre un conjunto comun de muestras identicas en los modelos que compara, y reporta el FPR
+pedido junto al realmente obtenido: los empates en la escala de sospecha impiden alcanzar exactamente el 5%.
+Separa los resultados CONFIRMATORIOS (dos modelos, n suficiente, intervalos de Wilson) de los EXPLORATORIOS,
+que no se presentan como hallazgo.
 
 ## Archivos
 
@@ -55,6 +70,8 @@ en la cuota gratuita diaria de un modelo; `--offset` reparte la bateria entre va
     scripts/bateria.py       corre toda la bateria para un modelo y un tramo de entregas
     scripts/scorecard.py     boletin por modelo y canal, con intervalos y figura
     scripts/analyze.py       TPR a FPR fijo, variantes de doble vista, inestabilidad y estratos
+    scripts/paquete.py       paquete autorizado: offline, conjunto comun, FPR real, PASS/FAIL
+    results/paquete/         paquete de resultados autorizado (lo que sostiene la ficha)
     results/boletin/         boletin actual
     results/g35lite/         corrida de 80 y 80 con las variantes de doble vista
     results/pruebas/         pruebas exploratorias pequenas; no son resultados
@@ -75,6 +92,9 @@ la llamada de prueba y `--max-connections` en `scripts/run_monitors.py`, y la ac
 Tambien con Claude Code: los canales de la bateria en `dualview/injections.py`, la vista `raw_ws`, `--offset` y
 `--no-ping`, `scripts/bateria.py`, `scripts/scorecard.py`, el plan B de `scripts/analyze.py`, `BATERIA.md`, `FICHA.md`
 y este README. Los numeros salen de las corridas; ninguno fue escrito a mano.
+Tambien con Claude (Claude Code): `scripts/paquete.py` (conjunto comun de muestras entre modelos, umbral con
+FPR real reportado, separacion confirmatorio/exploratorio, controles PASS/FAIL y demo offline), revisado por
+el equipo. No toca los scripts de corrida ni de analisis: solo lee los CSV ya generados.
 Trabajos relacionados que hay que leer y citar antes de entregar: arXiv 2510.09462 (ataques adaptativos a
 monitores confiables), arXiv 2602.10153 (legibilidad y monitoreo), arXiv 2507.15886 (combinacion de monitores).
 

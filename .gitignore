@@ -8,3 +8,4 @@ results/bateria/log_*.txt
 results/bateria/*/log.txt
 results/bateria/*/prompt_samples.txt
 .kiro/
+results/bateria/*/log_rescate.txt

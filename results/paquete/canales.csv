@@ -1,0 +1,13 @@
+modelo,canal,n_atrapados,escapan,frac_escapan
+gemini-3.1-flash-lite,control_neutral,64,3,0.046875
+gemini-3.1-flash-lite,dev_en,64,0,0.0
+gemini-3.1-flash-lite,heldout_es,64,0,0.0
+gemini-3.1-flash-lite,heldout_nocomment,64,0,0.0
+gemini-3.1-flash-lite,ident_en,64,2,0.03125
+gemini-3.1-flash-lite,justify_en,64,2,0.03125
+gemini-3.5-flash-lite,control_neutral,74,4,0.05405405405405406
+gemini-3.5-flash-lite,dev_en,74,1,0.013513513513513514
+gemini-3.5-flash-lite,heldout_es,59,0,0.0
+gemini-3.5-flash-lite,heldout_nocomment,59,1,0.01694915254237288
+gemini-3.5-flash-lite,ident_en,59,3,0.05084745762711865
+gemini-3.5-flash-lite,justify_en,59,1,0.01694915254237288

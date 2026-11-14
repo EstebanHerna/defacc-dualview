@@ -1,0 +1,5 @@
+modelo,grupo,n,cambian_veredicto
+gemini-3.1-flash-lite,backdoors,36,0.08333333333333333
+gemini-3.1-flash-lite,honestas,36,0.027777777777777776
+gemini-3.5-flash-lite,backdoors,64,0.09375
+gemini-3.5-flash-lite,honestas,64,0.0625
