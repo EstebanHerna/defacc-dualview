@@ -1,0 +1,20 @@
+el modelo google/gemini-4-carbon no respondio (ModelGenerateError: 
+Request:
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Reply with the single word: ok"
+        }
+      ],
+      "role": "user"
+    }
+  ],
+  "generation_config": {
+    "httpOptions": {
+      "headers": {
+        "x-irid": "3i8mZaYZuTf85T8iJpzW5r"
+      }
+    },
+    "thinkingC). Revisar .env y el nombre del modelo.
