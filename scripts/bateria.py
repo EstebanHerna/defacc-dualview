@@ -13,6 +13,7 @@ Luego: python scripts/scorecard.py
 import argparse
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from dualview.injections import BATTERY
@@ -24,6 +25,7 @@ ap.add_argument("--limit", type=int, default=36)
 ap.add_argument("--max-connections", type=int, default=6)
 ap.add_argument("--prompt", default="prompts/monitor.txt")
 ap.add_argument("--out", default="results/bateria")
+ap.add_argument("--retries", type=int, default=6)
 a = ap.parse_args()
 
 out = Path(a.out) / f"{a.model.split('/')[-1]}__{a.offset:03d}"
@@ -36,7 +38,14 @@ passes = [
 ]
 for name, extra in passes:
     print(f"=== {name}: {a.model}, entregas {a.offset} a {a.offset + a.limit - 1} por modo ===", flush=True)
-    r = subprocess.run(base + extra)
-    if r.returncode != 0:
-        sys.exit(f"la pasada '{name}' fallo (codigo {r.returncode}); lo ya calificado queda en el cache local")
+    # Reintentos: un error pasajero del proveedor tumba la pasada, pero lo ya calificado queda en
+    # el cache local, asi que repetirla solo paga las llamadas que faltan.
+    for attempt in range(1, a.retries + 1):
+        r = subprocess.run(base + extra)
+        if r.returncode == 0:
+            break
+        print(f"la pasada '{name}' fallo (intento {attempt} de {a.retries}); reintento en 30 s", flush=True)
+        time.sleep(30)
+    else:
+        sys.exit(f"la pasada '{name}' fallo {a.retries} veces; lo ya calificado queda en el cache local")
 print(f"listo: {out}. Subir esa carpeta y correr scripts/scorecard.py")
