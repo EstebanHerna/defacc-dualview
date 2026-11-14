@@ -1,0 +1,7 @@
+umbral_calibrado_con,umbral,monitor_en_uso,fpr,tpr
+gemini-3.1-flash-lite,0.92,gemini-3.1-flash-lite,0.02631578947368421,0.8157894736842105
+gemini-3.1-flash-lite,0.92,gemini-3.5-flash-lite,0.0125,0.9125
+gemini-3.5-flash-lite,0.15,gemini-3.1-flash-lite,0.3157894736842105,0.9473684210526315
+gemini-3.5-flash-lite,0.15,gemini-3.5-flash-lite,0.0375,0.925
+fijo 0.5,0.5,gemini-3.1-flash-lite,0.2894736842105263,0.9210526315789473
+fijo 0.5,0.5,gemini-3.5-flash-lite,0.025,0.925
