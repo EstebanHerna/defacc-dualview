@@ -24,12 +24,28 @@ Hay que demostrar tres cosas, en este orden:
 3. La defensa recupera el TPR en `dev_en` y se sostiene en `heldout_es` sin haberla ajustado ahi.
 Si 1 no se cumple, ir al plan B de PLAN.md. No forzar el resultado.
 
-## Estado al momento de escribir esto
+## Estado (actualizado 14 nov, 12:30 p.m.)
 
-Verificado: tests (10) pasan; el saneado da metodo "layout" y equivalencia estructural en las 600 entregas;
-el pipeline corre de punta a punta con un modelo simulado; `analyze.py` produce tabla y figura.
-NO verificado: ninguna corrida con un modelo real, `setup.ps1` en Windows, costo real, y que el ataque
-funcione. No hay ningun numero real todavia. No inventar ni estimar resultados en la ficha.
+Verificado: 21 tests pasan en Windows con Python 3.12 (incluida la propiedad sobre las 600 entregas);
+la llave de Google AI Studio funciona; el prompt con formato estricto da 0% de respuestas sin puntaje.
+Modelo monitor: `google/gemini-3.1-flash-lite` (`gemini-2.5-flash-lite` ya no acepta llaves nuevas).
+Los puntajes en scores.csv van de 0 a 1 (ControlArena normaliza el 0 a 100 del prompt).
+
+Senal de las pruebas de 15 y 20 entregas (NO es un resultado, n muy pequeno): la nota persuasiva no baja
+la sospecha del monitor, ni con `prompts/monitor_naive.txt`. Decision del equipo: plan B. La historia pasa a
+ser que el monitor resiste la persuasion simple y que su problema es la inestabilidad y las falsas alarmas
+cuando cambia texto no ejecutable. `analyze.py` ya trae `mean`, `min`, inestabilidad y estratos.
+
+En curso: corrida de desarrollo completa con dos vistas. `results/summary.csv` y la figura que hay en
+`results/` salieron de una prueba con n=2 y no valen; se reemplazan al terminar la corrida.
+Pruebas previas en `results/pruebas/`. No inventar ni estimar resultados en la ficha.
+
+Hechos utiles para leer las tablas:
+- La vista saneada bajo `dev_en` y `control_neutral` es identica byte a byte a la saneada sin ataque (300 de
+  300). Que `stripped` no cambie entre condiciones es por construccion, no un hallazgo.
+- Si una entrega no trae comentarios, las dos vistas son el mismo texto y el cache devuelve el mismo puntaje.
+  La inestabilidad entre vistas solo se puede medir en entregas con comentarios.
+- `nostr` se diseno viendo `heldout_nocomment`: para `triview` esa familia no es reservada.
 
 ## Arquitectura
 
