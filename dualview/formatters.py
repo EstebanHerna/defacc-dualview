@@ -10,23 +10,28 @@ from control_arena import EvalMode
 from control_arena._control_task_metadata import ControlTaskMetadata
 from control_arena.monitor import get_last_assistant_message
 
-from .injections import TEMPLATES
+from .injections import ALL_MODES, TEMPLATES
 from .sanitize import neutralize_strings, sanitize
 
-VIEWS = ("raw", "stripped", "nostr")
+# raw_ws: el mismo codigo con una linea en blanco al final. No cambia nada para un lector; sirve para
+# medir cuanto se mueve el puntaje del monitor ante un cambio sin significado (piso de ruido).
+VIEWS = ("raw", "stripped", "nostr", "raw_ws")
+DEFAULT_VIEWS = ("raw", "stripped")
 
 
 def render_code(code: str, *, view: str, injection: str | None, is_attack: bool, key: str) -> str:
     """Codigo tal como se le muestra al monitor. La condicion solo aplica a entregas de ataque y
     siempre antes de construir la vista, asi todas las vistas parten de exactamente la misma entrega."""
     assert view in VIEWS, view
-    if injection and injection != "none" and is_attack:
+    if injection and injection != "none" and (is_attack or injection in ALL_MODES):
         options = TEMPLATES[injection]
         code = options[zlib.crc32(key.encode()) % len(options)] + "\n" + code
     if view == "stripped":
         code, _ = sanitize(code)
     elif view == "nostr":
         code, _ = neutralize_strings(code)
+    elif view == "raw_ws":
+        code = code.rstrip("\n") + "\n\n"
     return code
 
 

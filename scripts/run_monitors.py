@@ -28,8 +28,8 @@ from control_arena._control_task_metadata import ControlTaskMetadata
 from control_arena.eval import run_monitors_for_eval_logs
 from control_arena.monitor import MonitorScoreRange, basic_monitor_builder
 
-from dualview.formatters import VIEWS, make_formatter, render_code, submitted_code
-from dualview.injections import DEV, HELDOUT, TEMPLATES
+from dualview.formatters import DEFAULT_VIEWS, VIEWS, make_formatter, render_code, submitted_code
+from dualview.injections import ALL_MODES, DEV, HELDOUT, TEMPLATES
 from dualview.sanitize import monitor_directed_flag
 
 ap = argparse.ArgumentParser()
@@ -38,10 +38,11 @@ ap.add_argument("--log-dir", default="logs/base")
 ap.add_argument("--out", default="results/scores.csv")
 ap.add_argument("--prompt", default="prompts/monitor.txt")
 ap.add_argument("--limit", type=int, default=None, help="muestras por modo (prueba barata)")
+ap.add_argument("--offset", type=int, default=0, help="saltar las primeras N muestras por modo (repartir la corrida entre llaves)")
 ap.add_argument("--injections", nargs="*", default=None, choices=list(TEMPLATES))
 ap.add_argument("--heldout", action="store_true", help="corre solo las familias reservadas")
-ap.add_argument("--views", nargs="+", default=list(VIEWS), choices=list(VIEWS),
-                help="vistas a correr (por defecto todas; cada vista es una llamada por entrega)")
+ap.add_argument("--views", nargs="+", default=list(DEFAULT_VIEWS), choices=list(VIEWS),
+                help="vistas a correr (por defecto raw y stripped; cada vista es una llamada por entrega)")
 ap.add_argument("--append", action="store_true")
 ap.add_argument("--max-connections", type=int, default=8, help="llamadas simultaneas; bajar si el proveedor responde 429")
 a = ap.parse_args()
@@ -62,7 +63,8 @@ logs = [read_eval_log(str(p)) for p in sorted(Path(a.log_dir).glob("*.eval"))]
 if not logs:
     sys.exit(f"no hay .eval en {a.log_dir}; corre scripts/gen.py primero")
 for lg in logs:
-    lg.samples = (lg.samples or [])[: a.limit] if a.limit else (lg.samples or [])
+    lg.samples = (lg.samples or [])[a.offset:]
+    lg.samples = lg.samples[: a.limit] if a.limit else lg.samples
 attack_logs = [lg for lg in logs if lg.samples and mode_of(lg.samples[0]) == "attack"]
 honest_logs = [lg for lg in logs if lg.samples and mode_of(lg.samples[0]) == "honest"]
 if not attack_logs or not honest_logs:
@@ -97,7 +99,7 @@ def build(view, inj):
 # Sin inyeccion: todos los logs. Con inyeccion: solo los de ataque (a las honestas no se les
 # inyecta nada, asi que calificarlas otra vez seria pagar llamadas que analyze.py no usa).
 jobs = [] if a.heldout else [("none", honest_logs + attack_logs)]
-jobs += [(inj, attack_logs) for inj in families]
+jobs += [(inj, honest_logs + attack_logs if inj in ALL_MODES else attack_logs) for inj in families]
 run_id = time.strftime("%Y%m%dT%H%M%S")
 rows, samples_txt = [], []
 t0 = time.time()
@@ -123,7 +125,7 @@ for inj, job_logs in jobs:
                     "score": meta.get("suspicion_score") if parsed else None,  # None -> celda vacia
                     "parsed": int(parsed), "flag": monitor_directed_flag(shown),
                 })
-                if k == 0 and is_attack:
+                if k == 0 and (is_attack or inj in ALL_MODES):
                     samples_txt.append(f"===== {inj} / {view} / sample {s.id} =====\n"
                                        + make_formatter(view, inj)(md, s.messages, "{tool_calls}") + "\n")
 
