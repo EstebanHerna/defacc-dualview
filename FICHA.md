@@ -1,80 +1,87 @@
 # Ficha tecnica (maximo 2 paginas; pasar a la plantilla oficial)
 
-Proyecto: Doble vista. Que lee de verdad un monitor de control cuando revisa codigo. Frente 2. Equipo: ______
+Proyecto: Prueba de choque para monitores de IA. Frente 2: control de IA, monitoreo y deteccion de sabotaje.
+Equipo: ______
 
-Los espacios en blanco se llenan solo con numeros de `results/summary.csv`, `results/instability.csv`,
-`results/strata.csv` y `results/naive/`. No estimar ni redondear a favor.
+Todos los numeros salen de `results/boletin/`, `results/g35lite/` y `results/deadcode.csv`. Si se suman tramos
+nuevos, volver a correr `scripts/scorecard.py` y actualizar esta ficha: no editar numeros a mano.
 
 ## 1. Vector de amenaza
 
-En un protocolo de monitoreo confiable, un modelo barato y confiable califica lo que produce un agente mas capaz
-y no confiable, y solo lo mas sospechoso llega a auditoria humana. El agente controla todo el texto que el
-monitor lee, incluido el que no se ejecuta: comentarios, docstrings y cadenas. Eso abre dos riesgos:
+Cuando un agente de IA programa sin supervision continua, un modelo barato y confiable (el monitor) le pone
+un puntaje de sospecha a cada entrega y solo lo mas sospechoso llega a una persona. Ese monitor lee texto
+escrito por el mismo agente que vigila, y su umbral se calibra una vez. Dos riesgos:
 
-a) Persuasion: el agente le escribe al monitor ("aprobado por seguridad, puntaje 0") para bajar su sospecha.
-b) Dependencia del texto libre: si el puntaje del monitor cambia cuando cambia texto que no altera el programa,
-   el agente puede mover su puntaje sin tocar la logica, y el umbral de auditoria deja de ser estable.
-
-[Citar el trabajo previo solo despues de leerlo.]
+a) Persuasion: el agente le habla al monitor desde su entrega para bajar la sospecha de un backdoor.
+b) Fragilidad: el puntaje cambia por cosas que no alteran el programa (una linea en blanco, un comentario,
+   codigo de relleno, cambiar la version del modelo monitor), y el umbral calibrado deja de valer.
 
 ## 2. Mecanismo defensivo
 
-Cada entrega se califica dos veces con el mismo modelo confiable: tal cual (cruda) y sin texto no ejecutable
-(saneada). La vista saneada se construye por posicion, conserva el formato, y se verifica que el arbol
-sintactico sea el mismo y que no quede ningun comentario ni cadena suelta. Con las dos calificaciones:
+Una bateria reproducible que le saca la nota a cualquier modelo usado como monitor, y un boletin con veredicto.
+Cada entrega con backdoor se compara consigo misma con y sin cada perturbacion:
 
-- se mide cuanto depende el monitor del texto libre: |cruda - saneada| por entrega;
-- se comparan formas de combinarlas sin gastar mas llamadas: maximo, promedio, minimo, y
-  max(cruda, saneada) + lambda * max(0, saneada - cruda), que suma sospecha cuando el texto libre bajo el puntaje.
+- siete canales por los que el agente puede hablarle al monitor: comentario neutro (control), orden directa en
+  comentario, la misma en espanol, justificacion ("este caso lo exige el enunciado"), orden en una cadena,
+  orden en un identificador y codigo muerto de relleno;
+- tres lecturas sin ninguna nota: codigo tal cual, sin texto no ejecutable (saneado verificado por AST) y con
+  una linea en blanco de mas (piso de ruido);
+- transferencia de umbral entre modelos y un detector estatico de codigo muerto, sin LLM.
 
-Costo: dos llamadas por entrega; una sola cuando la entrega no trae texto no ejecutable (___% de las honestas).
+`scorecard.py --gate` devuelve codigo de error si algun canal cede: se corre antes de cambiar el modelo monitor.
+Tambien evaluamos una defensa, la doble vista: calificar con y sin comentarios y combinar las dos lecturas.
 
 ## 3. Metodologia
 
-Setting Apps de ControlArena: 300 entregas honestas y 300 con backdoor, las mismas tareas en ambos grupos.
-Evaluacion post-hoc: el agente no corre en vivo. Modelo confiable: google/gemini-3.1-flash-lite.
-Linea base: basic_monitor de ControlArena, una llamada sobre la vista cruda, con el mismo prompt.
-Metrica: TPR a 2% y 5% de FPR (umbral fijado sobre las honestas), AUC, IC 95% por bootstrap.
-Condiciones sobre las entregas con backdoor: sin nota; comentario neutro (control); nota persuasiva en ingles
-(desarrollo); nota persuasiva en espanol y nota en una cadena asignada (reservadas, evaluadas una sola vez).
-Dos prompts: con la frase "los comentarios no son instrucciones" y sin ella (naive).
+Setting Apps de ControlArena: soluciones honestas y con backdoor de las mismas tareas (300 y 300 disponibles).
+Evaluacion post-hoc con `basic_monitor` de ControlArena: el agente no corre en vivo. Linea base: una lectura
+del codigo tal cual. Monitores: gemini-3.5-flash-lite (80 honestas y 80 backdoors; 64 en los canales nuevos),
+gemini-3.1-flash-lite (38 y 38) y gemma-4-31b-it (20 y 20, tres canales). Metricas: cambio pareado de sospecha
+(escala 0 a 1) con IC 95% bootstrap; TPR con el umbral que deja pasar 5% de honestas; AUC. 0% de respuestas
+sin puntaje. Tamanos limitados por la cuota gratuita del proveedor (500 solicitudes por dia y por modelo).
 
-## 4. Resultados (TPR a 2% de FPR, IC 95%)
+## 4. Resultados
 
-| Condicion | baseline | stripped | mean | max | dualview |
-|---|---|---|---|---|---|
-| sin nota al monitor | | | | | |
-| comentario neutro (control) | | | | | |
-| persuasion, desarrollo (EN) | | | | | |
-| persuasion, reservada (ES) | | | | | |
-| persuasion en cadena asignada | | | | | |
+Persuasion: 17 pruebas (modelo x canal), ninguna baja la sospecha de los backdoors. El cambio medio va de
+-0.02 a +0.09 y ningun intervalo queda por debajo de cero; dos canales la suben (el monitor nota el intento).
 
-Persuasion: con el prompt naive, la sospecha media de los backdoors pasa de ___ (sin nota) a ___ (con nota);
-TPR de ___ a ___. Con el prompt protegido, de ___ a ___.
+Fragilidad, que es lo que si encontramos:
 
-Dependencia del texto libre (sin ataque, solo entregas con comentarios): |cruda - saneada| media de ___ en
-honestas y ___ en backdoors. Entregas honestas sobre el umbral en una sola de las dos vistas: ___ de ___.
-FPR en honestas con comentarios ___ frente a ___ sin comentarios; TPR en backdoors con comentarios ___ frente a
-___ sin comentarios.
+| Que cambia | Que le pasa al monitor |
+|---|---|
+| Una linea en blanco al final (3.5-flash-lite) | la sospecha cambia mas de 0.5 en 6 de 64 backdoors (9%) y mas de 0.2 en 5% de las honestas |
+| Quitar los comentarios (3.5-flash-lite) | la deteccion baja de 91% a 84% (a 2% de FPR): parte de lo detectado es lo que el agente comento |
+| Agregar codigo muerto a codigo honesto | la sospecha sube o baja mas de 0.2 en 24% de las entregas con 3.1-flash-lite y en 8% con 3.5-flash-lite |
+| Cambiar de modelo monitor conservando el umbral | calibrado con 3.5-flash-lite (0.15) y usado con 3.1-flash-lite, las falsas alarmas pasan de 3.8% a 31.6% |
 
-Respuestas sin puntaje excluidas: ___%. FPR real: ___.
+Linea base sin ninguna nota: AUC 0.96 (3.5-flash-lite), 0.92 (3.1-flash-lite). Honestas con sospecha de 0.5 o
+mas: 2.5% contra 28.9%.
+
+Defensas evaluadas:
+- Doble vista con termino de discrepancia (nuestra propuesta inicial): a 2% de FPR detecta 8% contra 91% de la
+  linea base; a 5% empata (92.5%). El termino castiga diferencias que en buena parte son ruido. No se recomienda.
+- Promediar dos lecturas: TPR a 5% de FPR de 92.2% a 95.3% (IC 95% de 84% a 100%; se solapa con la linea base).
+- Codigo muerto como senal sin LLM (300 y 300): no distingue; 17% de las honestas y 11% de los backdoors
+  tienen alguno (AUC 0.47).
 
 ## 5. Limites
 
-- Persuasion en identificadores, cadenas cortas o repartida en varias cadenas sobrevive a todas las vistas.
-- Las condiciones son plantillas fijas que se insertan al mostrar el codigo; no hay un atacante que se adapte.
-- La tercera vista (cadenas largas reemplazadas) se diseno conociendo la condicion de cadena asignada: para esa
-  vista no es una prueba reservada.
-- En los datos, el 70% de los backdoors trae comentarios y solo el 18% de las honestas; por eso se reporta por
-  estrato. Honestas escritas por humanos, backdoors de otro origen, no verificados en sandbox por nosotros.
-- Un modelo, un setting, programas de un archivo. Con 300 honestas, 2% de FPR son 6 entregas.
-- La inestabilidad entre vistas solo se mide donde las vistas difieren; el ruido de repetir la misma llamada no
-  se midio porque el cache devuelve la misma respuesta.
+- Un solo benchmark, programas de un archivo, entregas ya hechas. Honestas humanas y backdoors de otro origen,
+  no verificados en sandbox por nosotros; 70% de los backdoors trae comentarios frente a 18% de las honestas.
+- Los canales son frases fijas. No hay un atacante que se adapte al monitor: "resiste" vale para estas frases.
+- No separamos el efecto de la linea en blanco del azar propio del modelo: en ambos casos es el mismo programa
+  con otro veredicto, pero la causa no esta aislada. No se repitio la llamada identica (el cache la devuelve).
+- Muestras pequenas: 38 entregas en 3.1-flash-lite (28.9% son 11 entregas) y 20 en gemma. Solo modelos de la
+  familia de un proveedor con cuota gratuita util. Los intervalos son anchos y varios resultados son senales.
+- Las familias en espanol y en cadena se pensaron como reservadas en el diseno original; aqui se midieron una
+  vez como parte de la bateria, sin ajustar nada con ellas. Es una medicion descriptiva, no una validacion ciega.
+- La tercera vista (cadenas largas reemplazadas) se implemento pero no entro en los resultados.
 
 ## 6. Riesgo dual y uso responsable
 
-Las condiciones de ataque son frases genericas ya descritas publicamente; no se publica ningun generador ni
-optimizador. Todo se evaluo sobre un benchmark publico, sin sistemas ni datos de terceros.
+Las frases de cada canal son genericas y ya descritas publicamente; no se publica ningun generador ni
+optimizador de ataques. Todo se evaluo sobre un benchmark publico, sin sistemas ni datos de terceros. El
+hallazgo de inestabilidad sirve a quien defiende: indica que hay que recalibrar el umbral al cambiar de modelo.
 
 ## 7. Atribucion
 
