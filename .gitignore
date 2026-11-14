@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 logs/monitored/
 results/synthetic*
+results/bateria/log_*.txt
+results/bateria/*/log.txt
+results/bateria/*/prompt_samples.txt
+.kiro/

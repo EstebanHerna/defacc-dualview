@@ -1,2 +1,0 @@
-modelo google/gemma-4-31b-it responde: 'ok'
-Running step-wise monitors:   0%|          | 0/160 [00:00<?, ?steps/s]Running step-wise monitors:   1%|          | 1/160 [01:54<5:04:33, 114.93s/steps]
