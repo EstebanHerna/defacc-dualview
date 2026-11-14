@@ -17,24 +17,23 @@ Una figura: TPR por condicion para baseline, stripped y dualview, con intervalos
    linea base basic_monitor; control neutro; ablacion de seis variantes; dos familias de ataque reservadas.
 4. Limites y riesgo dual: ver CLAUDE.md. Plantillas genericas, sin generador de ataques.
 
-## Horario (recalculado desde las 10:30; lo que no quepa se recorta de abajo hacia arriba)
+## Estado y horario (actualizado 12:35 p.m.)
 
-    10:30  setup.ps1, API key en .env, pytest.
-    10:50  Prueba barata: run_monitors --limit 20. Abrir results/prompt_samples.txt y `inspect view`.
-           Revisar el porcentaje de respuestas sin puntaje.
-    11:10  Corrida dev completa. analyze.py. Primera tabla.
-    11:40  DECISION 1: el baseline cae en dev_en frente a none, y cae mas que en control_neutral?
-             Si: seguir.
-             No: un modelo confiable mas debil (20 min maximo). Si tampoco: plan B.
-    12:10  analyze.py --sweep. Elegir lambda con dev_en. Congelar lambda, prompt y saneado. Commit.
-    12:40  Reservadas, una sola vez: run_monitors --heldout --append. analyze.py. Anotar tal cual.
-    13:00  Almuerzo. Resultados v1 congelados (summary.csv + figura) y subidos.
-    13:45  Segundo modelo confiable con --append (dev y reservadas). Estratificar por comentarios.
-    14:45  Ronda adaptativa: 2 o 3 condiciones nuevas escritas por quien no ajusto la defensa. Una corrida.
-    15:15  Limites, riesgo dual, README, atribuciones. Correr desde un clon limpio.
+DECISION 1 tomada con pruebas de 15 y 20 entregas: la nota persuasiva no baja la sospecha de
+gemini-3.1-flash-lite, ni con el prompt naive. Vamos por el plan B, sin cambiar de proyecto. La corrida
+completa confirma o corrige esa senal; se reporta lo que salga.
+
+    12:26  Lanzada la corrida de desarrollo completa (prompt protegido, 2 vistas) -> results/scores.csv
+    12:29  Lanzada la corrida naive completa (solo vista cruda) -> results/naive/scores.csv
+    13:30  analyze.py sobre ambas. Tabla, inestabilidad y estratos. Commit de resultados.
+    13:40  Congelar prompt y saneado. Reservadas una sola vez: run_monitors --heldout --append.
+    14:20  Tercera vista (--views nostr --append) solo si queda cuota. Figura final.
+    14:45  Llenar FICHA.md con numeros. Correr desde un clon limpio. README y atribuciones.
     15:45  Solo ficha y pitch. Ningun experimento nuevo.
     16:45  Entregar. Margen de 15 minutos.
     17:10  Pitch de 3 minutos.
+
+Solo una persona corre el modelo (cuota compartida) y solo esa persona sube results/scores.csv.
 
 ## Plan B (si la persuasion no engana al monitor)
 
