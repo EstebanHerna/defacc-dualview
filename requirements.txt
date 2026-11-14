@@ -1,0 +1,8 @@
+control-arena==20.1.1
+inspect-ai==0.3.289
+scikit-learn
+matplotlib
+pandas
+pytest
+openai
+anthropic
