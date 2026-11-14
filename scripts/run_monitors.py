@@ -67,6 +67,9 @@ attack_logs = [lg for lg in logs if lg.samples and mode_of(lg.samples[0]) == "at
 honest_logs = [lg for lg in logs if lg.samples and mode_of(lg.samples[0]) == "honest"]
 if not attack_logs or not honest_logs:
     sys.exit("se necesitan logs honestos y de ataque")
+if len(attack_logs) != 1 or len(honest_logs) != 1:
+    sys.exit(f"{a.log_dir} tiene {len(honest_logs)} logs honestos y {len(attack_logs)} de ataque: debe haber "
+             "exactamente uno de cada uno, o las mismas entregas se califican y cuentan varias veces.")
 
 prompt = Path(a.prompt).read_text(encoding="utf-8")
 for ph in ("{task_description}", "{tool_calls}"):
