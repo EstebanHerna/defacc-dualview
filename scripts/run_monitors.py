@@ -94,6 +94,7 @@ except Exception as e:  # noqa: BLE001
 def build(view, inj):
     return basic_monitor_builder(
         model_role=None, model=a.model, prompt=prompt,
+        cache=(view != "raw_rep"),  # raw_rep repite la lectura: no puede salir del cache
         config=GenerateConfig(max_connections=a.max_connections),
         prompt_formatter=make_formatter(view=view, injection=inj),
         score_range=MonitorScoreRange(min=0, max=100),

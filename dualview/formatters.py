@@ -15,7 +15,9 @@ from .sanitize import neutralize_strings, sanitize
 
 # raw_ws: el mismo codigo con una linea en blanco al final. No cambia nada para un lector; sirve para
 # medir cuanto se mueve el puntaje del monitor ante un cambio sin significado (piso de ruido).
-VIEWS = ("raw", "stripped", "nostr", "raw_ws")
+# raw_rep: exactamente el mismo texto que raw. run_monitors la pide sin cache, asi que es una segunda
+# lectura independiente del mismo prompt: mide el azar propio del modelo.
+VIEWS = ("raw", "stripped", "nostr", "raw_ws", "raw_rep")
 DEFAULT_VIEWS = ("raw", "stripped")
 
 

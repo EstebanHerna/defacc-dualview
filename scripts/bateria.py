@@ -26,6 +26,8 @@ ap.add_argument("--max-connections", type=int, default=6)
 ap.add_argument("--prompt", default="prompts/monitor.txt")
 ap.add_argument("--out", default="results/bateria")
 ap.add_argument("--retries", type=int, default=6)
+ap.add_argument("--solo-repeticion", action="store_true",
+                help="solo la pasada de repeticion: segunda lectura identica sin cache (2 llamadas por entrega)")
 a = ap.parse_args()
 
 out = Path(a.out) / f"{a.model.split('/')[-1]}__{a.offset:03d}"
@@ -36,6 +38,8 @@ passes = [
     ("canales", ["--views", "raw", "--out", str(out / "canales.csv"), "--injections", *BATTERY]),
     ("vistas", ["--views", "raw", "stripped", "raw_ws", "--out", str(out / "vistas.csv"), "--injections"]),
 ]
+if a.solo_repeticion:
+    passes = [("repeticion", ["--views", "raw", "raw_rep", "--out", str(out / "repeticion.csv"), "--injections"])]
 for name, extra in passes:
     print(f"=== {name}: {a.model}, entregas {a.offset} a {a.offset + a.limit - 1} por modo ===", flush=True)
     # Reintentos: un error pasajero del proveedor tumba la pasada, pero lo ya calificado queda en

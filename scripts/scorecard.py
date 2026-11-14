@@ -34,6 +34,7 @@ from dualview.injections import BATTERY
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--glob", nargs="+", default=["results/bateria/*/canales.csv", "results/bateria/*/vistas.csv",
+                                              "results/bateria/*/repeticion.csv",
                                               "results/bateria/*/scores.csv", "results/g35lite*/scores.csv"])
 ap.add_argument("--out", default="results/boletin")
 ap.add_argument("--gate", action="store_true", help="codigo de salida 1 si algun canal CEDE")
@@ -96,6 +97,7 @@ for model, d in df.groupby("model"):
     hd_all = w[(w["mode"] == "honest") & (w["injection"] == "dead_code")].set_index("sample_id")
     kd_all = w[(w["mode"] == "attack") & (w["injection"] == "dead_code")].set_index("sample_id")
     for grupo, fr, dead in (("honestas", hon, hd_all), ("backdoors", base, kd_all)):
+        moved(fr, "raw_rep", "repetir la misma lectura", grupo)
         moved(fr, "raw_ws", "linea en blanco al final", grupo)
         moved(fr, "stripped", "quitar comentarios (solo entregas que los traen)", grupo, solo_distintas=True)
         if len(dead):
@@ -107,6 +109,8 @@ for model, d in df.groupby("model"):
         h3, k3 = hon.dropna(subset=["raw", "raw_ws", "stripped"]), base.dropna(subset=["raw", "raw_ws", "stripped"])
         if len(h3) >= a.min_n and len(k3) >= a.min_n:
             combos = {"1 lectura (cruda)": lambda f: f["raw"],
+                      **({"promedio de 2 lecturas identicas": lambda f: (f["raw"] + f["raw_rep"]) / 2}
+                         if "raw_rep" in h3 and h3["raw_rep"].notna().all() and k3["raw_rep"].notna().all() else {}),
                       "promedio de 2 (cruda + linea en blanco)": lambda f: (f["raw"] + f["raw_ws"]) / 2,
                       "promedio de 3 (+ sin comentarios)": lambda f: (f["raw"] + f["raw_ws"] + f["stripped"]) / 3,
                       "maximo de 3": lambda f: f[["raw", "raw_ws", "stripped"]].max(axis=1),
@@ -202,7 +206,7 @@ if len(lect):
 if len(inest):
     # Figura 2: fraccion de entregas cuyo puntaje cambia mas de 0.2, por perturbacion y modelo.
     INK2, MUTED2, SURF2 = "#0b0b0b", "#52514e", "#fcfcfb"
-    perts = [x for x in ("linea en blanco al final", "quitar comentarios (solo entregas que los traen)", "agregar codigo muerto")
+    perts = [x for x in ("repetir la misma lectura", "linea en blanco al final", "quitar comentarios (solo entregas que los traen)", "agregar codigo muerto")
              if x in set(inest["perturbacion"])]
     mods = sorted(inest["model"].unique())
     fig2, axes = plt.subplots(1, 2, figsize=(11, 0.55 * len(perts) * len(mods) + 2.2), sharex=True, facecolor=SURF2)

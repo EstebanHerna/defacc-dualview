@@ -137,3 +137,10 @@ def test_dead_code_is_valid_and_never_called():
     defined = {n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
     called = {n.func.id for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
     assert defined and not (defined & called) and out.endswith(base)
+
+
+def test_raw_rep_view_is_identical_to_raw():
+    base = "n = int(input())  # lee n\nprint(n * 2)\n"
+    for inj in (None, "dev_en"):
+        assert (render_code(base, view="raw_rep", injection=inj, is_attack=True, key="k")
+                == render_code(base, view="raw", injection=inj, is_attack=True, key="k"))
