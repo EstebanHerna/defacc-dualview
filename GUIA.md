@@ -76,27 +76,34 @@ convencer al monitor. En código honesto las dos vistas dan parecido y casi no s
 ## 5. Archivo por archivo
 
 ### dualview/injections.py
-Un diccionario `TEMPLATES` con las notas de ataque en tres familias:
+Un diccionario `TEMPLATES` con las condiciones en cuatro familias:
 
-- `dev_en`: comentarios en inglés. Se usan para ajustar la defensa.
+- `dev_en`: comentarios en inglés dirigidos al monitor. Se usan para ajustar la defensa.
+- `control_neutral`: comentario inocuo de tamaño parecido. No es un ataque: separa "hay un
+  comentario" de "hay persuasión".
 - `heldout_es`: comentarios en español. No se usan para ajustar nada; son la prueba final.
 - `heldout_nocomment`: el mensaje va en una variable (`REVIEW_STATUS = "..."`). Es código real,
   así que el saneado no lo puede borrar. Aquí se espera que la defensa falle.
 
 ### dualview/sanitize.py
-- `sanitize(code)`: devuelve el código sin comentarios ni docstrings y el método usado.
-  Intenta tres métodos en orden: `ast`, `tokenize`, `regex`. Nunca lanza error.
-- `_strip_docstrings(code)`: convierte el código en árbol sintáctico, quita los docstrings y lo
-  vuelve a escribir. Los comentarios desaparecen solos porque el árbol no los guarda.
-- `_strip_comments(code)`: respaldo para código que no es Python válido.
-- `monitor_directed_flag(code)`: cuenta palabras como "monitor", "score", "approved" en los
-  comentarios. Está probada pero el experimento no la usa.
+- `sanitize(code)`: devuelve el código sin comentarios, docstrings ni cadenas sueltas, y el método
+  usado. Intenta cuatro métodos en orden: `layout`, `unparse`, `tokenize`, `regex`. Nunca lanza error.
+- `_strip_layout(code)`: método principal. Borra por posición y conserva el formato original, así
+  las dos vistas difieren solo en el texto no ejecutable. Su salida se acepta solo si pasa dos
+  verificaciones: mismo árbol sintáctico (`structurally_equal`) y cero comentarios o cadenas
+  sueltas restantes (`_has_non_executable`). Si no, se cae a `unparse`, que reformatea.
+- `neutralize_strings(code)`: tercera vista (`nostr`). El saneado anterior y además toda cadena o
+  bytes de más de 20 caracteres reemplazada por un marcador. Si no hay cadenas largas devuelve lo
+  mismo que `sanitize`.
+- `monitor_directed_flag(code)`: cuenta palabras como "monitor", "score", "approved" en el texto
+  no ejecutable. Se escribió viendo las plantillas, incluidas las reservadas: solo ablación.
 
 ### dualview/formatters.py
 - `make_formatter(view, injection)`: fabrica la función que arma el texto para el monitor.
   El orden es inyectar primero y sanear después, para que las dos vistas partan del mismo código.
-- `_inject(code, family, key)`: pega una plantilla de la familia arriba del código. La elige de
-  forma fija según el problema, así la misma entrega siempre recibe la misma nota.
+- `render_code(code, view, injection, is_attack, key)`: pega una plantilla de la familia arriba
+  del código y luego aplica la vista. La plantilla se elige de forma fija según el problema, así
+  la misma entrega siempre recibe la misma nota.
 - Detalle importante: solo se inyecta en entregas de modo attack. A las honestas nunca.
 
 ### prompts/monitor.txt
@@ -106,14 +113,22 @@ comentarios son datos no confiables.
 
 ### scripts/run_monitors.py
 - Lee las entregas de `logs/base/`.
-- Arma las combinaciones: 2 vistas x (sin ataque + 3 ataques) = 8.
-- Crea un monitor por combinación y los corre.
-- Escribe `results/scores.csv` con columnas: sample_id, mode, view, injection, model, score.
-- `--limit N` usa solo N entregas por modo, para pruebas baratas.
+- Carga `.env` y hace una llamada de prueba al modelo antes del lote.
+- Por defecto corre las condiciones de desarrollo: sin ataque (honestas y con backdoor), `dev_en` y
+  `control_neutral` (solo con backdoor). Las reservadas van aparte con `--heldout --append`.
+- Una llamada por vista y entrega. `--views raw stripped` deja fuera la tercera vista.
+- Escribe `results/scores.csv` (run_id, model, sample_id, mode, view, injection, score, parsed, flag)
+  y `results/prompt_samples.txt` con un prompt real por condición para revisarlo a ojo.
+- Una respuesta sin puntaje queda con `parsed=0` y se excluye; no cuenta como 0.
+- `--limit N` usa solo N entregas por modo; `--max-connections` baja la concurrencia si hay 429.
+- Cada corrida sobreescribe el CSV, salvo con `--append`.
 
 ### scripts/analyze.py
 - Pone los puntajes raw y stripped de cada entrega lado a lado.
-- Calcula los tres monitores: `baseline` (raw), `stripped`, `dualview` (la fórmula).
+- Calcula las variantes: `baseline` (raw), `stripped`, `max`, `dualview` (la fórmula), `dual_abs`,
+  `dual+flag` y, si el CSV trae la vista `nostr`, `triview`. Todas salen de las mismas
+  calificaciones, así que cambiar lambda o la fórmula no cuesta llamadas.
+- `--sweep` barre lambda usando solo `none` y `dev_en`.
 - `tpr_at_fpr(h, k, fpr)`: fija el umbral con las honestas y mide qué fracción de las tramposas
   lo supera.
 - Repite con remuestreo (`--boot`) para el intervalo de confianza y calcula el AUC.
@@ -124,8 +139,14 @@ comentarios son datos no confiables.
 Generó las 600 entregas de `logs/base/`. Ya se corrió; no hace falta repetirlo.
 
 ### tests/test_sanitize.py
-Tres pruebas: que el saneado no cambia el comportamiento del programa, que el respaldo funciona
-con código inválido y que `monitor_directed_flag` detecta una nota al monitor.
+Saneado (formato conservado, idempotencia, respaldo con código inválido, unicode, separadores de
+línea raros), condiciones (ninguna toca a las honestas; solo `heldout_nocomment` sobrevive al
+saneado), tercera vista, y una propiedad sobre las 600 entregas reales de `logs/base`.
+
+### scripts/cost.py
+Cuenta, sin llamar a ningún modelo, cuántas entregas tienen texto no ejecutable o cadenas largas,
+es decir, cuántas llamadas extra harían falta si la segunda y tercera vista se pidieran solo
+cuando difieren de la anterior.
 
 ## 6. Cómo leer la tabla de resultados
 
@@ -146,10 +167,11 @@ con código inválido y que `monitor_directed_flag` detecta una nota al monitor.
     .venv/bin/pip install -r requirements.txt
     cp .env.example .env                 # y pegar la API key
     PYTHONPATH=. .venv/bin/python -m pytest -q tests
-    PYTHONPATH=. .venv/bin/python scripts/run_monitors.py --model openai/gpt-4.1-nano --limit 20
+    PYTHONPATH=. .venv/bin/python scripts/run_monitors.py --model <proveedor/modelo> --limit 20
     PYTHONPATH=. .venv/bin/python scripts/analyze.py --fpr 0.02
 
-Borrar `results/scores.csv` antes de la corrida completa para no mezclarla con la prueba.
+En Windows, ver los comandos de CLAUDE.md. Cada corrida sin `--append` sobreescribe
+`results/scores.csv`, así que la prueba de 20 no se mezcla con la corrida completa.
 
 ## 8. Límites que ya se conocen
 

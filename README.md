@@ -33,6 +33,9 @@ Tambien se generaron con Claude (Claude Code), y quedan pendientes de revision p
 `nostr` y el monitor `triview` (`neutralize_strings` y `has_long_string` en `dualview/sanitize.py`, `--views` en
 `scripts/run_monitors.py`, `triview` en `scripts/analyze.py`), la deteccion de respuestas sin puntaje
 ("No score found") y la prueba nueva de `tests/test_sanitize.py`.
+Tambien con Claude Code: la correccion del saneado ante separadores de linea (`_has_non_executable` y el
+corte de lineas en `_strip_layout`), el reemplazo de `bytes` largos en `nostr`, sus pruebas, la carga de `.env`,
+la llamada de prueba y `--max-connections` en `scripts/run_monitors.py`, y la actualizacion de `GUIA.md`.
 Trabajos relacionados que hay que leer y citar antes de entregar: arXiv 2510.09462 (ataques adaptativos a
 monitores confiables), arXiv 2602.10153 (legibilidad y monitoreo), arXiv 2507.15886 (combinacion de monitores).
 

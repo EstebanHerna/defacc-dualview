@@ -50,7 +50,7 @@ calificaciones, asi que cambiar la formula o lambda no cuesta tokens.
 ## Comandos (PowerShell, desde la raiz)
 
     powershell -ExecutionPolicy Bypass -File setup.ps1
-    copy .env.example .env        # y poner la API key; Inspect lee .env solo
+    copy .env.example .env        # y poner la API key (GOOGLE_API_KEY); run_monitors.py carga .env
     $env:PYTHONPATH = "."
     .\.venv\Scripts\python -m pytest -q tests
     .\.venv\Scripts\python scripts\run_monitors.py --model <proveedor/modelo> --limit 20     # prueba barata
@@ -59,6 +59,9 @@ calificaciones, asi que cambiar la formula o lambda no cuesta tokens.
     .\.venv\Scripts\python scripts\analyze.py --sweep                                        # lambda, solo dev_en
     .\.venv\Scripts\python scripts\run_monitors.py --model <proveedor/modelo> --heldout --append   # UNA vez, al final
     .\.venv\Scripts\inspect view                                                             # ver trayectorias
+
+Modelos: el equipo usa Google AI Studio. Variable `GOOGLE_API_KEY`, paquete `google-genai`, y el modelo se
+escribe `google/<nombre exacto que muestra AI Studio>`. Si aparecen errores 429, bajar `--max-connections`.
 
 ## Reglas del experimento (no romperlas)
 
