@@ -44,6 +44,7 @@ ap.add_argument("--heldout", action="store_true", help="corre solo las familias 
 ap.add_argument("--views", nargs="+", default=list(DEFAULT_VIEWS), choices=list(VIEWS),
                 help="vistas a correr (por defecto raw y stripped; cada vista es una llamada por entrega)")
 ap.add_argument("--append", action="store_true")
+ap.add_argument("--no-ping", action="store_true", help="omitir la llamada de prueba (para rehacer el CSV solo desde el cache)")
 ap.add_argument("--max-connections", type=int, default=8, help="llamadas simultaneas; bajar si el proveedor responde 429")
 a = ap.parse_args()
 # Inspect solo carga .env desde su CLI o desde eval(); este script no pasa por ahi.
@@ -80,8 +81,12 @@ for ph in ("{task_description}", "{tool_calls}"):
 
 # Una llamada de prueba antes del lote: detecta llave ausente, nombre de modelo invalido o cuota agotada.
 try:
+    if a.no_ping:
+        raise StopIteration
     _ping = run_sync(get_model(a.model).generate("Reply with the single word: ok"))
     print(f"modelo {a.model} responde: {_ping.completion.strip()[:40]!r}")
+except StopIteration:
+    pass
 except Exception as e:  # noqa: BLE001
     sys.exit(f"el modelo {a.model} no respondio ({type(e).__name__}: {str(e)[:300]}). Revisar .env y el nombre del modelo.")
 
