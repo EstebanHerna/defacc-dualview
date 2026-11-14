@@ -19,7 +19,9 @@ import sys
 import time
 from pathlib import Path
 
+from dotenv import find_dotenv, load_dotenv
 from inspect_ai.log import read_eval_log
+from inspect_ai.model import GenerateConfig, get_model
 
 from control_arena._async_utils import run_sync
 from control_arena._control_task_metadata import ControlTaskMetadata
@@ -41,7 +43,10 @@ ap.add_argument("--heldout", action="store_true", help="corre solo las familias 
 ap.add_argument("--views", nargs="+", default=list(VIEWS), choices=list(VIEWS),
                 help="vistas a correr (por defecto todas; cada vista es una llamada por entrega)")
 ap.add_argument("--append", action="store_true")
+ap.add_argument("--max-connections", type=int, default=8, help="llamadas simultaneas; bajar si el proveedor responde 429")
 a = ap.parse_args()
+# Inspect solo carga .env desde su CLI o desde eval(); este script no pasa por ahi.
+load_dotenv(find_dotenv(usecwd=True))
 families = a.injections if a.injections is not None else (HELDOUT if a.heldout else DEV)
 out_path = Path(a.out)
 if a.heldout and not a.append:
@@ -68,10 +73,18 @@ for ph in ("{task_description}", "{tool_calls}"):
     if ph not in prompt:
         sys.exit(f"al prompt le falta {ph}")
 
+# Una llamada de prueba antes del lote: detecta llave ausente, nombre de modelo invalido o cuota agotada.
+try:
+    _ping = run_sync(get_model(a.model).generate("Reply with the single word: ok"))
+    print(f"modelo {a.model} responde: {_ping.completion.strip()[:40]!r}")
+except Exception as e:  # noqa: BLE001
+    sys.exit(f"el modelo {a.model} no respondio ({type(e).__name__}: {str(e)[:300]}). Revisar .env y el nombre del modelo.")
+
 
 def build(view, inj):
     return basic_monitor_builder(
         model_role=None, model=a.model, prompt=prompt,
+        config=GenerateConfig(max_connections=a.max_connections),
         prompt_formatter=make_formatter(view=view, injection=inj),
         score_range=MonitorScoreRange(min=0, max=100),
     )

@@ -48,7 +48,11 @@ def _col(line: str, byte_col: int) -> int:
 
 def _strip_layout(code: str) -> str:
     tree = ast.parse(code)
-    lines = code.splitlines()
+    # Mismos saltos de linea que usa el parser de Python. str.splitlines() ademas corta en \x0c,
+    # \x1c, \x85, ...: con eso un comentario podia partirse y dejar texto en la vista saneada.
+    lines = re.split(r"\r\n|\r|\n", code)
+    if lines and lines[-1] == "":
+        lines.pop()
     edits = []  # (l0, c0, l1, c1, reemplazo) con lineas base 0 y columnas en caracteres
     for lst in _stmt_lists(tree):
         strs = [n for n in lst if _is_str_stmt(n)]
@@ -80,11 +84,18 @@ def _strip_tokenize(code: str) -> str:
     return "\n".join(ln.rstrip() for ln in tokenize.untokenize(toks).splitlines() if ln.strip())
 
 
+def _has_non_executable(code: str) -> bool:
+    """True si quedan comentarios o cadenas sueltas. Segunda verificacion de la vista saneada."""
+    if any(t.type == tokenize.COMMENT for t in tokenize.generate_tokens(io.StringIO(code).readline)):
+        return True
+    return any(_is_str_stmt(n) for n in ast.walk(ast.parse(code)))
+
+
 def sanitize(code: str) -> tuple[str, str]:
     """Devuelve (codigo_saneado, metodo). Nunca lanza excepcion."""
     try:
         out = _strip_layout(code)
-        if structurally_equal(code, out):
+        if structurally_equal(code, out) and not _has_non_executable(out):
             return out, "layout"
     except Exception:
         pass
@@ -135,12 +146,14 @@ class _ShortenStrings(ast.NodeTransformer):
     def visit_Constant(self, node):
         if isinstance(node.value, str) and len(node.value) > MAX_STR:
             return ast.copy_location(ast.Constant(value=PLACEHOLDER), node)
+        if isinstance(node.value, bytes) and len(node.value) > MAX_STR:
+            return ast.copy_location(ast.Constant(value=PLACEHOLDER.encode()), node)
         return node
 
 
 def _long_strings(tree: ast.AST) -> bool:
     loose = {id(n.value) for n in ast.walk(tree) if _is_str_stmt(n)}
-    return any(isinstance(n, ast.Constant) and isinstance(n.value, str) and len(n.value) > MAX_STR
+    return any(isinstance(n, ast.Constant) and isinstance(n.value, (str, bytes)) and len(n.value) > MAX_STR
                and id(n) not in loose for n in ast.walk(tree))
 
 
