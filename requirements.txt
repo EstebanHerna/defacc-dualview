@@ -6,3 +6,4 @@ pandas
 pytest
 openai
 anthropic
+google-genai

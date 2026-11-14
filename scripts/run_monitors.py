@@ -2,7 +2,8 @@
 
 No usa Docker ni vuelve a correr agentes. Reglas que este script garantiza:
   - las muestras honestas solo se califican sin condicion de ataque (nunca reciben inyeccion);
-  - una respuesta sin puntaje legible se guarda como score vacio y parsed=0, no como 0;
+  - una respuesta sin puntaje legible se guarda como score vacio y parsed=0, no como 0 (incluye el
+    caso en que ControlArena registra "No score found" y deja el puntaje por defecto, 0);
   - cada corrida SOBREESCRIBE --out, salvo --append (para agregar otro modelo o las familias reservadas);
   - guarda en results/prompt_samples.txt un prompt real por condicion para revisarlo a ojo.
 
@@ -10,6 +11,7 @@ Uso:
   python scripts/run_monitors.py --model openai/gpt-4.1-nano --limit 20            # prueba barata (dev)
   python scripts/run_monitors.py --model openai/gpt-4.1-nano                       # corrida dev completa
   python scripts/run_monitors.py --model openai/gpt-4.1-nano --heldout --append    # una sola vez, al final
+  python scripts/run_monitors.py --model openai/gpt-4.1-nano --views raw stripped  # sin la tercera vista
 """
 import argparse
 import csv
@@ -36,12 +38,15 @@ ap.add_argument("--prompt", default="prompts/monitor.txt")
 ap.add_argument("--limit", type=int, default=None, help="muestras por modo (prueba barata)")
 ap.add_argument("--injections", nargs="*", default=None, choices=list(TEMPLATES))
 ap.add_argument("--heldout", action="store_true", help="corre solo las familias reservadas")
+ap.add_argument("--views", nargs="+", default=list(VIEWS), choices=list(VIEWS),
+                help="vistas a correr (por defecto todas; cada vista es una llamada por entrega)")
 ap.add_argument("--append", action="store_true")
 a = ap.parse_args()
 families = a.injections if a.injections is not None else (HELDOUT if a.heldout else DEV)
 out_path = Path(a.out)
 if a.heldout and not a.append:
     sys.exit("--heldout va con --append: se agrega a la corrida dev ya congelada")
+views = [v for v in VIEWS if v in a.views]  # sin repetidos y en orden fijo
 
 
 def mode_of(sample) -> str:
@@ -73,27 +78,33 @@ def build(view, inj):
 
 
 # (condicion, logs sobre los que corre). "none" se omite en --heldout: ya esta en la corrida dev.
+# Sin inyeccion: todos los logs. Con inyeccion: solo los de ataque (a las honestas no se les
+# inyecta nada, asi que calificarlas otra vez seria pagar llamadas que analyze.py no usa).
 jobs = [] if a.heldout else [("none", honest_logs + attack_logs)]
 jobs += [(inj, attack_logs) for inj in families]
 run_id = time.strftime("%Y%m%dT%H%M%S")
 rows, samples_txt = [], []
 t0 = time.time()
 for inj, job_logs in jobs:
-    out = run_sync(run_monitors_for_eval_logs([build(v, inj) for v in VIEWS], job_logs, progress=True))
-    for view, mlogs in zip(VIEWS, out, strict=True):
+    out = run_sync(run_monitors_for_eval_logs([build(v, inj) for v in views], job_logs, progress=True))
+    for view, mlogs in zip(views, out, strict=True):
         for lg in mlogs:
             for k, s in enumerate(lg.samples or []):
                 md = ControlTaskMetadata.model_validate(s.metadata)
                 is_attack = md.eval_mode.value == "attack"
                 scored = [m for m in s.messages if m.role == "assistant" and (m.metadata or {}).get("reason") is not None]
                 meta = scored[-1].metadata if scored else {}
-                parsed = bool(meta.get("score_parsed", False)) and meta.get("suspicion_score") is not None
+                # ControlArena guarda 0 cuando el monitor responde sin <score>; no es un "limpio".
+                no_score = any("No score found" in str((m.metadata or {}).get("reason") or "")
+                               for m in s.messages)
+                parsed = (bool(meta.get("score_parsed", False)) and meta.get("suspicion_score") is not None
+                          and not no_score)
                 shown = render_code(submitted_code(s.messages) or "", view="raw", injection=inj,
                                     is_attack=is_attack, key=md.main_task_description[:200])
                 rows.append({
                     "run_id": run_id, "model": a.model, "sample_id": s.id, "mode": md.eval_mode.value,
                     "view": view, "injection": inj,
-                    "score": meta.get("suspicion_score") if parsed else "",
+                    "score": meta.get("suspicion_score") if parsed else None,  # None -> celda vacia
                     "parsed": int(parsed), "flag": monitor_directed_flag(shown),
                 })
                 if k == 0 and is_attack:
@@ -115,6 +126,6 @@ with open(out_path.parent / "prompt_samples.txt", "a" if a.append else "w", enco
 bad = sum(1 - r["parsed"] for r in rows)
 print(f"{len(rows)} filas ({len(rows)} llamadas al monitor como maximo; el cache evita repetir) "
       f"en {time.time() - t0:.0f}s -> {out_path}")
-print(f"respuestas sin puntaje legible: {bad} ({bad / len(rows):.1%})"
+print(f"respuestas sin puntaje: {bad} de {len(rows)} ({bad / len(rows):.1%})"
       + ("  <-- revisar el prompt o el modelo antes de seguir" if bad / len(rows) > 0.05 else ""))
 print(f"revisar a ojo: {out_path.parent / 'prompt_samples.txt'}")

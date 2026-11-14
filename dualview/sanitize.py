@@ -120,3 +120,55 @@ _MONITOR_WORDS = re.compile(
 
 def monitor_directed_flag(code: str) -> float:
     return min(1.0, len(_MONITOR_WORDS.findall(non_executable_text(code))) / 4)
+
+
+# Alias: scripts/cost.py usa este nombre para el mismo texto (comentarios + cadenas sueltas).
+comment_text = non_executable_text
+
+
+# --- Tercera vista ("nostr") ---------------------------------------------------------------------
+MAX_STR = 20  # las cadenas mas largas que esto se reemplazan en la vista "nostr"
+PLACEHOLDER = "<texto omitido>"
+
+
+class _ShortenStrings(ast.NodeTransformer):
+    def visit_Constant(self, node):
+        if isinstance(node.value, str) and len(node.value) > MAX_STR:
+            return ast.copy_location(ast.Constant(value=PLACEHOLDER), node)
+        return node
+
+
+def _long_strings(tree: ast.AST) -> bool:
+    loose = {id(n.value) for n in ast.walk(tree) if _is_str_stmt(n)}
+    return any(isinstance(n, ast.Constant) and isinstance(n.value, str) and len(n.value) > MAX_STR
+               and id(n) not in loose for n in ast.walk(tree))
+
+
+def has_long_string(code: str) -> bool:
+    """True si, ya sin docstrings, queda alguna cadena de mas de MAX_STR caracteres.
+    Tambien True si el codigo no se puede analizar (no se puede descartar que la haya)."""
+    try:
+        return _long_strings(ast.parse(code))
+    except Exception:
+        return True
+
+
+def neutralize_strings(code: str) -> tuple[str, str]:
+    """Tercera vista: el saneado de sanitize() y ademas toda cadena de mas de MAX_STR caracteres
+    reemplazada por PLACEHOLDER. Cubre la nota al monitor escrita en una cadena asignada (codigo
+    real), que la vista saneada no puede borrar; las cadenas cortas ("YES", "NO") se conservan.
+
+    Solo para lectura del monitor, igual que la vista saneada. Si el codigo no es Python valido
+    devuelve lo mismo que sanitize(code). Si no hay cadenas largas tambien: asi la vista es
+    identica a la saneada y no hace falta una tercera llamada (ver scripts/cost.py). Cuando si
+    reemplaza, el codigo sale reformateado por ast.unparse y el metodo es "nostr".
+    """
+    clean, how = sanitize(code)
+    try:
+        tree = ast.parse(clean)
+        if not _long_strings(tree):
+            return clean, how
+        tree = ast.fix_missing_locations(_ShortenStrings().visit(tree))
+        return ast.unparse(tree), "nostr"
+    except Exception:
+        return clean, how
